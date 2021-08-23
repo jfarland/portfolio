@@ -1,0 +1,137 @@
+---
+title: "Advanced Grid Forecasting - London Smart Meters"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+dependencies <-
+  c("caret", "h2o", "glmnet", "neuralnet", "mgcv", "hts", "fable", # DataScience
+    "tidyverse", "data.table", "glue", "rgeos", "jsonlite", # Data Wrangling
+    "ggplot2", "ggsci", "gridExtra", "kableExtra", # Plotting
+    "sparklyr", "doParallel", # Distributed Computing
+    "devtools", "reticulate", "bit64", "twilio", "getPass") # Developer Tools
+
+new_packages <- 
+  dependencies[!(dependencies %in% installed.packages()[,"Package"])]
+
+tryCatch({if(length(new_packages)) install.packages(new_packages)})
+
+lapply(dependencies, require, character.only = TRUE)
+
+options(scipen = 999)
+
+```
+
+# Motivation
+
+Being able to accurately forecast the volatile demand for power, especially 
+across low-voltage distribution grids, is increasingly important to providing 
+sufficent energy supply. Paradoxically, it's at the low-voltage networks that 
+are the most volatile, and yet the most critical to account for as more 
+distributed energy resources (e.g., solar, storage) make their way onto the 
+grid. From the grid operator's point of view, not only are lower voltage 
+service points (e.g., customers) the revenue life blood of the business, having
+increased visibility into demand at such lower levels of aggregation helps 
+to provide.
+
+In this notebook, I explore looking at a Kaggle data set containing about 5,000 
+utility service points with time series data from advanced metering 
+infrastructure (AMI). The context of this experiment is to simulate the needs of
+a utility or grid operator and generate accurate short-term (up to 7 days ahead)
+forecast. I explore possible approaches that involve
+
+- *Feature-based modeling approaches*
+- *Customer Segmentation + Clustering*
+- *Statistical methods, ML methods, and hybrid cross-learning approaches*
+
+Performance is evaluated using time-series cross-validation using a rolling 
+7-day forecast horizon.
+
+Finally, I show how this solution might be scaled and put into production 
+following ML Ops best practices from my experiences. 
+
+Keywords: *time series classification*, *energy forecasting*, *cross-learning*, *MLOps*
+
+# Data
+```{r hhdata, echo=TRUE}
+project_path <- "/Users/jonfarland/Dropbox/08-Projects/showcase/"
+data_path <- glue('{project_path}/data')
+
+all_files <- list.files(paste0(data_path, "/archive/hhblock_dataset/hhblock_dataset"))
+
+# Loop over files and read them in
+df <- 
+  lapply(all_files, function(x){
+    fread(paste0(data_path, "/archive/hhblock_dataset/hhblock_dataset/", x))
+})
+df <- do.call(rbind, df)
+
+head(df)
+
+```
+```{r}
+
+df_long <- 
+  df %>%
+  pivot_longer(
+    cols = starts_with("hh_"),
+    values_to = "kw",
+    names_to = "hh",
+    names_prefix = "hh_"
+  )
+
+head(df_long)
+
+```
+```{r make_timestamp}
+
+# Import Lookup table between half-hour integers to a true POSIX-formatted
+# time string.
+
+lookup <- 
+  fread(paste0(data_path,  "/time-lookup.csv")) %>%
+  mutate(hh = as.character(hh))
+
+# Merge on lookup and create true timestamps. Clean, rename, and drop 
+# unused fields. 
+
+kw_df <-
+  df_long %>%
+  left_join(lookup, by = "hh") #%>%
+  #mutate(
+   # timestamp = ISOdatetime(
+   #     year(date), month(date), day(date), hour(time), minute(time), 0),
+   # node_id = LCLid) %>%
+  #select(node_id, date, time, timestamp, kw)
+
+# No longer needed
+rm(df, df_long)
+
+# Garbage Collection
+gc()
+
+summary(kw_df)
+
+```
+
+```{r hh_data_viz}
+
+sample_ids <-
+  distinct(kw_df, node_id) %>%
+  sample_n(10)
+
+sample_df <- 
+  inner_join(sample_ids, kw_df, by = c("node_id"))
+
+ggplot(sample_df %>% filter(date == "BLAH"), aes(fill = node_id)) + 
+  geom_point(aes(x = time, y = kw), shape = 21)
+
+```
+# Feature Engineering
+
+#
+
+
+

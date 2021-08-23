@@ -55,7 +55,7 @@ following ML Ops best practices from my experiences.
 Keywords: *time series classification*, *energy forecasting*, *cross-learning*, *MLOps*
 
 # Data
-```{r hhdata, echo = TRUE}
+```{r hhdata, echo=TRUE}
 project_path <- "/Users/jonfarland/Dropbox/08-Projects/showcase/"
 data_path <- glue('{project_path}/data')
 
